@@ -3,10 +3,16 @@ var stream = require('stream'),
     util = require('util'),
     events = require('events');
 
-var Parser = function(fileName) {
+var Parser = function(fileName, options) {
   var self = this;
   this.fileName = fileName;
   this.header = this.getHeader();
+  this.parseTypes = true;
+
+  if (options) {
+    if (typeof options.parseTypes !== 'undefined')
+      this.parseTypes = options.parseTypes;
+  }
 
   var hStart = this.header.start,
       hNumRecs = this.header.numberOfRecords,
@@ -18,12 +24,9 @@ var Parser = function(fileName) {
   var bufLoc = hStart;
   var overflow = null;
 
-  var fileStream = fs.createReadStream(this.fileName);
-  fileStream.on('end', function() {
-    self.emit('end');
-  });
-  fileStream.on('readable', function() {
-    var buffer = fileStream.read();
+  this.stream = new stream.Transform({objectMode: true});
+  this.stream._transform = function(chunk, encoding, done) {
+    var buffer = chunk;
     if (bufLoc !== hStart) {
       bufLoc = 0;
     }
@@ -33,7 +36,7 @@ var Parser = function(fileName) {
 
     while (loc < hEndLoc && (bufLoc + hRecLen) <= buffer.length) {
       var newRec = self.parseRecord(++sequenceNumber, buffer.slice(bufLoc, bufLoc += hRecLen));
-      self.emit('record', newRec);
+      this.push(newRec);
     }
     loc += bufLoc;
     if (bufLoc < buffer.length) {
@@ -41,12 +44,10 @@ var Parser = function(fileName) {
     } else {
       overflow = null;
     }
-  });
+    done();
+  };
 
-  /*var transform = new stream.Transform({objectMode: true});
-  transform._transform = function(chunk, encoding, done) {
-
-  };*/
+  fs.createReadStream(this.fileName).pipe(this.stream);
 };
 
 util.inherits(Parser, events.EventEmitter);
@@ -60,14 +61,22 @@ Parser.prototype.parseRecord = function(sequenceNumber, buffer) {
   };
   var loc = 1;
   for (var i = 0; i < this.header.fields.length; i++) {
-    record[this.header.fields[i].name] = 
-      self.parseField(buffer.slice(loc, loc += this.header.fields[i].length));
+    (function(field){
+      record[field.name] = self.parseField(field, buffer.slice(loc, loc += field.length));
+    })(this.header.fields[i]);
   }
   return record;
 };
 
-Parser.prototype.parseField = function(buffer) {
-  return (buffer.toString('utf-8')).replace(/^\x20+|\x20+$/g, '');
+Parser.prototype.parseField = function(field, buffer) {
+  var data = (buffer.toString('utf-8')).replace(/^\x20+|\x20+$/g, '');
+
+  if (this.parseTypes) {
+    if (field.type === 'N') data = parseInt(data);
+    else if (field.type === 'F') data = parseFloat(data);
+  }
+
+  return data;
 };
 
 Parser.prototype.getHeader = function() {
