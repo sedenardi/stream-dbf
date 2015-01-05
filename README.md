@@ -3,7 +3,7 @@ stream-dbf
 
 A dBase DBF file parser that outputs a node stream.
 
-`stream-dbf` uses the logic from abstractvector's [node-dbf](https://github.com/abstractvector/node-dbf). I've transcribed his CoffeeScript source to plain Javascript and used that logic with Node's built-in `Transform` stream.
+`stream-dbf` uses the logic from abstractvector's [node-dbf](https://github.com/abstractvector/node-dbf) in a `Transform` stream. It's written in plain javascript and has no dependencies.
 
     npm install stream-dbf
 

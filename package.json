@@ -1,6 +1,6 @@
 {
   "name": "stream-dbf",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A dBase DBF file parser that outputs a node stream.",
   "main": "index.js",
   "repository": {
