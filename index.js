@@ -31,7 +31,7 @@ var Parser = function(fileName, options) {
       bufLoc = 0;
     }
     if (overflow !== null) {
-      buffer = overflow + buffer;
+      buffer = Buffer.concat([overflow,buffer]);
     }
 
     while (loc < hEndLoc && (bufLoc + hRecLen) <= buffer.length) {
@@ -69,11 +69,10 @@ Parser.prototype.parseRecord = function(sequenceNumber, buffer) {
 };
 
 Parser.prototype.parseField = function(field, buffer) {
-  var data = (buffer.toString('utf-8')).replace(/^\x20+|\x20+$/g, '');
+  var data = buffer.toString('utf-8').replace(/^\x20+|\x20+$/g, '');
 
   if (this.parseTypes) {
-    if (field.type === 'N') data = parseInt(data);
-    else if (field.type === 'F') data = parseFloat(data);
+    if (field.type === 'N' || field.type === 'F') data = Number(data);
   }
 
   return data;
@@ -99,7 +98,7 @@ Parser.prototype.parseHeader = function(data) {
 
   header.fields = fieldData.map(this.parseFieldSubRecord);
   return header;
-}
+};
 
 Parser.prototype.parseHeaderDate = function(buffer) {
   var day, month, year;
