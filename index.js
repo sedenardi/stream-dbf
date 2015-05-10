@@ -78,12 +78,21 @@ Parser.prototype.parseField = function(field, buffer) {
   return data;
 };
 
+
 Parser.prototype.getHeader = function() {
-  var data = fs.readFileSync(this.fileName);
-  return this.parseHeader(data);
+  var fd = fs.openSync( this.fileName, 'r' )
+    , buff = new Buffer( 32 )
+    , header;
+  fs.readSync( fd, buff, 0, 32, 0 );
+  header = this.parseBaseHeader( buff );
+  buff = new Buffer( header.headerLength );
+  fs.readSync( fd, buff, 0, header.headerLength, 0 );
+  this.parseFieldsHeader( header, buff );
+  fs.closeSync( fd );
+  return header;
 };
 
-Parser.prototype.parseHeader = function(data) {
+Parser.prototype.parseBaseHeader = function(data) {
   var header = {
     'version'        : data.readUInt8  (  0, true ),
     'dateUpdated'    : this.parseHeaderDate( data.slice(1, 4) ),
@@ -92,14 +101,16 @@ Parser.prototype.parseHeader = function(data) {
     'recordLength'   : data.readInt16LE( 10, true ),
     'fields'         : []
   };
+  return header;
+};
 
+Parser.prototype.parseFieldsHeader = function(header, data) {
   var fieldData = [];
-  for (var i = 32; i <= header.headerLength - 32; i += 32) {
-    fieldData.push(data.slice(i, i + 32));
+  for (var i = 32; i <= header.headerLength-32; i += 32) {
+    fieldData.push( data.slice(i, i + 32) );
   }
 
   header.fields = fieldData.map(this.parseFieldSubRecord);
-  return header;
 };
 
 Parser.prototype.parseHeaderDate = function(buffer) {
