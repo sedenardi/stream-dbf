@@ -14,7 +14,7 @@ var Parser = function(fileName, options) {
       this.parseTypes = options.parseTypes;
   }
 
-  var hStart = this.header.start,
+  var hStart = this.header.headerLength,
       hNumRecs = this.header.numberOfRecords,
       hRecLen = this.header.recordLength,
       hEndLoc = hStart + hNumRecs * hRecLen;
@@ -84,15 +84,17 @@ Parser.prototype.getHeader = function() {
 };
 
 Parser.prototype.parseHeader = function(data) {
-  var header = {};
-  header.type = (data.slice(0, 1)).toString('utf-8');
-  header.dateUpdated = this.parseHeaderDate(data.slice(1, 4));
-  header.numberOfRecords = (data.slice(4, 8)).readInt32LE(0, true);
-  header.start = (data.slice(8, 10)).readInt32LE(0, true);
-  header.recordLength = (data.slice(10, 12)).readInt32LE(0, true);
+  var header = {
+    'version'        : data.readUInt8  (  0, true ),
+    'dateUpdated'    : this.parseHeaderDate( data.slice(1, 4) ),
+    'numberOfRecords': data.readInt32LE(  4, true ),
+    'headerLength'   : data.readInt16LE(  8, true ),
+    'recordLength'   : data.readInt16LE( 10, true ),
+    'fields'         : []
+  };
 
   var fieldData = [];
-  for (var i = 32; i <= header.start - 32; i += 32) {
+  for (var i = 32; i <= header.headerLength - 32; i += 32) {
     fieldData.push(data.slice(i, i + 32));
   }
 
@@ -101,20 +103,20 @@ Parser.prototype.parseHeader = function(data) {
 };
 
 Parser.prototype.parseHeaderDate = function(buffer) {
-  var day, month, year;
-  year = 1900 + (buffer.slice(0, 1)).readInt32LE(0, true);
-  month = ((buffer.slice(1, 2)).readInt32LE(0, true)) - 1;
-  day = (buffer.slice(2, 3)).readInt32LE(0, true);
-  return new Date(year, month, day);
+  var day   = buffer.readUInt8( 0, true ) + 1900
+    , month = buffer.readUInt8( 1, true ) - 1
+    , year  = buffer.readUInt8( 2, true );
+  return new Date( year, month, day );
 };
 
 Parser.prototype.parseFieldSubRecord = function(buffer) {
   var field = {
-    name: ((buffer.slice(0, 11)).toString('utf-8')).replace(/[\u0000]+$/, ''),
-    type: (buffer.slice(11, 12)).toString('utf-8'),
-    displacement: (buffer.slice(12, 16)).readInt32LE(0, true),
-    length: (buffer.slice(16, 17)).readInt32LE(0, true),
-    decimalPlaces: (buffer.slice(17, 18)).readInt32LE(0, true)
+    'name'         : buffer.toString( 'utf-8',  0, 11 ).replace( /\u0000+$/, '' ),
+    'type'         : buffer.toString( 'utf-8', 11, 12 ),
+    'displacement' : buffer.readInt32LE( 12, true ),
+    'length'       : buffer.readUInt8( 16, true ),
+    'decimalPlaces': buffer.readUInt8( 17, true ),
+    'indexFlag'    : buffer.readUInt8( 31, true )
   };
   return field;
 };
