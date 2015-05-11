@@ -5,45 +5,54 @@ var stream = require('stream'),
 
 var Parser = function(fileName, options) {
   var self = this;
-  this.fileName = fileName;
-  this.header = this.getHeader();
+  this.fileName   = fileName;
+  this.header     = this.getHeader();
+  this.fieldsCnt  = this.header.fields.length;
   this.parseTypes = true;
 
   if (options) {
-    if (typeof options.parseTypes !== 'undefined')
+    if ( options.parseTypes != undefined )
       this.parseTypes = options.parseTypes;
   }
 
-  var hStart = this.header.headerLength,
-      hNumRecs = this.header.numberOfRecords,
-      hRecLen = this.header.recordLength,
-      hEndLoc = hStart + hNumRecs * hRecLen;
+  var hNumRecs  = this.header.numberOfRecords
+    , hRecLen   = this.header.recordLength
+    , hDataSize = hNumRecs * hRecLen;
 
-  var sequenceNumber = 0;
-  var loc = hStart;
-  var bufLoc = hStart;
-  var overflow = null;
+  var seqNumber  = 0
+    , skipBytes  = this.header.headerLength
+    , byteReades = 0
+    , buffer     = new Buffer(0);
 
-  this.stream = new stream.Transform({objectMode: true});
-  this.stream._transform = function(chunk, encoding, done) {
-    var buffer = chunk;
-    if (bufLoc !== hStart) {
-      bufLoc = 0;
+  this.stream = new stream.Transform({ 'objectMode': true });
+  this.stream._transform = function( chunk, encoding, done ) {
+    var buffPos = 0
+      , buffLen = 0
+      , rec;
+    buffer  = Buffer.concat([ buffer, chunk ]);
+    buffLen = buffer.length;
+    
+    if ( skipBytes ) {
+      if( skipBytes >= buffLen ) {
+        skipBytes = skipBytes - buffLen;
+        done();
+        return;
+      }
+      buffPos   = skipBytes;
+      skipBytes = 0;
     }
-    if (overflow !== null) {
-      buffer = Buffer.concat([overflow,buffer]);
+    
+    while ( byteReades<hDataSize && (buffPos+hRecLen)<=buffLen ) {
+      rec = self.parseRecord(
+              ++seqNumber,
+              buffer.slice( buffPos, buffPos+hRecLen )
+      );
+      buffPos += hRecLen;
+      byteReades += hRecLen;
+      this.push( rec );
     }
-
-    while (loc < hEndLoc && (bufLoc + hRecLen) <= buffer.length) {
-      var newRec = self.parseRecord(++sequenceNumber, buffer.slice(bufLoc, bufLoc += hRecLen));
-      this.push(newRec);
-    }
-    loc += bufLoc;
-    if (bufLoc < buffer.length) {
-      overflow = buffer.slice(bufLoc, buffer.length);
-    } else {
-      overflow = null;
-    }
+    
+    buffer = buffer.slice( buffPos, buffLen );
     done();
   };
 
@@ -57,22 +66,31 @@ Parser.prototype.parseRecord = function(sequenceNumber, buffer) {
 
   var record = {
     '@sequenceNumber': sequenceNumber,
-    '@deleted': (buffer.slice(0, 1))[0] !== 32
+    '@deleted'       : buffer[0] !== 32
   };
-  var loc = 1;
-  for (var i = 0; i < this.header.fields.length; i++) {
-    (function(field){
-      record[field.name] = self.parseField(field, buffer.slice(loc, loc += field.length));
-    })(this.header.fields[i]);
+  for ( var i=0, pos=1, fld; i < this.fieldsCnt; i++ ) {
+    fld = this.header.fields[i];
+    record[fld.name] = self.parseField( fld, buffer.slice(pos, pos+fld.length) );
+    pos += fld.length;
   }
   return record;
 };
 
 Parser.prototype.parseField = function(field, buffer) {
-  var data = buffer.toString('utf-8').replace(/^\x20+|\x20+$/g, '');
+  var st  = 0
+    , end = buffer.length;
+  while( end>st && buffer[end-1]===32 ) end--;
+  while( st<end && buffer[st   ]===32 ) st++;
+  
+  if( field.raw ) {
+        return buffer.slice( st, end );
+  }
 
-  if (this.parseTypes) {
-    if (field.type === 'N' || field.type === 'F') data = Number(data);
+  var data = buffer.toString( 'utf-8', st, end );
+  if ( this.parseTypes ) {
+    if ( field.type==='N' || field.type==='F' ) {
+      data = Number( data );
+    }
   }
 
   return data;
@@ -122,7 +140,7 @@ Parser.prototype.parseHeaderDate = function(buffer) {
 
 Parser.prototype.parseFieldSubRecord = function(buffer) {
   var field = {
-    'name'         : buffer.toString( 'utf-8',  0, 11 ).replace( /\u0000+$/, '' ),
+    'name'         : buffer.toString( 'utf-8',  0, 11 ).replace( /\x00+$/, '' ),
     'type'         : buffer.toString( 'utf-8', 11, 12 ),
     'displacement' : buffer.readInt32LE( 12, true ),
     'length'       : buffer.readUInt8( 16, true ),
