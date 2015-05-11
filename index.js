@@ -9,10 +9,13 @@ var Parser = function(fileName, options) {
   this.header     = this.getHeader();
   this.fieldsCnt  = this.header.fields.length;
   this.parseTypes = true;
+  this.recAsArray = false;
 
   if (options) {
     if ( options.parseTypes != undefined )
       this.parseTypes = options.parseTypes;
+    if ( options.recAsArray != undefined )
+      this.recAsArray = options.recAsArray;
   }
 
   var hNumRecs  = this.header.numberOfRecords
@@ -43,10 +46,18 @@ var Parser = function(fileName, options) {
     }
     
     while ( byteReades<hDataSize && (buffPos+hRecLen)<=buffLen ) {
-      rec = self.parseRecord(
-              ++seqNumber,
-              buffer.slice( buffPos, buffPos+hRecLen )
-      );
+      if( self.recAsArray ) {
+        rec = self.parseRecordToArray(
+                ++seqNumber,
+                buffer.slice( buffPos, buffPos+hRecLen )
+        );
+      }
+      else {
+        rec = self.parseRecordToObject(
+                ++seqNumber,
+                buffer.slice( buffPos, buffPos+hRecLen )
+        );
+      }
       buffPos += hRecLen;
       byteReades += hRecLen;
       this.push( rec );
@@ -61,16 +72,26 @@ var Parser = function(fileName, options) {
 
 util.inherits(Parser, events.EventEmitter);
 
-Parser.prototype.parseRecord = function(sequenceNumber, buffer) {
-  var self = this;
-
+Parser.prototype.parseRecordToObject = function(sequenceNumber, buffer) {
   var record = {
     '@sequenceNumber': sequenceNumber,
     '@deleted'       : buffer[0] !== 32
   };
   for ( var i=0, pos=1, fld; i < this.fieldsCnt; i++ ) {
     fld = this.header.fields[i];
-    record[fld.name] = self.parseField( fld, buffer.slice(pos, pos+fld.length) );
+    record[fld.name] = this.parseField( fld, buffer.slice(pos, pos+fld.length) );
+    pos += fld.length;
+  }
+  return record;
+};
+
+Parser.prototype.parseRecordToArray = function(sequenceNumber, buffer) {
+  var record = new Array( this.fieldsCnt+2 );
+  record[0] = sequenceNumber;
+  record[1] = buffer[0] !== 32;
+  for ( var i=0, pos=1, fld; i < this.fieldsCnt; i++ ) {
+    fld = this.header.fields[i];
+    record[i+2] = this.parseField( fld, buffer.slice(pos, pos+fld.length) );
     pos += fld.length;
   }
   return record;
