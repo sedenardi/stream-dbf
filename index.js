@@ -24,9 +24,34 @@ var Parser = function(fileName, options) {
 
   var seqNumber  = 0
     , skipBytes  = this.header.headerLength
-    , byteReades = 0
+    , byteReaded = 0
     , buffer     = new Buffer(0);
 
+  function pushRecords( stream, buffer, buff_offset ) {
+    var buffPos = buff_offset
+      , buffLen = buffer.length
+      , rec;
+    
+    while ( byteReaded<hDataSize && (buffPos+hRecLen)<=buffLen ) {
+      if( self.recAsArray ) {
+        rec = self.parseRecordToArray(
+                ++seqNumber,
+                buffer.slice( buffPos, buffPos+hRecLen )
+        );
+      }
+      else {
+        rec = self.parseRecordToObject(
+                ++seqNumber,
+                buffer.slice( buffPos, buffPos+hRecLen )
+        );
+      }
+      buffPos += hRecLen;
+      byteReaded += hRecLen;
+      stream.push( rec );
+    }
+    return buffPos;
+  }
+  
   this.stream = new stream.Transform({ 'objectMode': true });
   this.stream._transform = function( chunk, encoding, done ) {
     var buffPos = 0
@@ -45,25 +70,14 @@ var Parser = function(fileName, options) {
       skipBytes = 0;
     }
     
-    while ( byteReades<hDataSize && (buffPos+hRecLen)<=buffLen ) {
-      if( self.recAsArray ) {
-        rec = self.parseRecordToArray(
-                ++seqNumber,
-                buffer.slice( buffPos, buffPos+hRecLen )
-        );
-      }
-      else {
-        rec = self.parseRecordToObject(
-                ++seqNumber,
-                buffer.slice( buffPos, buffPos+hRecLen )
-        );
-      }
-      buffPos += hRecLen;
-      byteReades += hRecLen;
-      this.push( rec );
-    }
-    
+    buffPos = pushRecords( this, buffer, buffPos );
     buffer = buffer.slice( buffPos, buffLen );
+    done();
+  };
+  this.stream._flush = function( done ) {
+    if( buffer.length > 0 ) {
+      pushRecords( this, buffer, 0 );
+    }
     done();
   };
 
