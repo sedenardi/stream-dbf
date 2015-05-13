@@ -86,6 +86,22 @@ var Parser = function(fileName, options) {
 
 util.inherits(Parser, events.EventEmitter);
 
+Parser.prototype.getFieldNo = function( field_name, case_sensitivity ) {
+  if( ! case_sensitivity ) {
+    field_name = field_name.toLowerCase();
+  }
+  for( var i=0, n; i<this.fieldsCnt; i++ ) {
+    n = this.header.fields[i].name;
+    if( ! case_sensitivity ) {
+      n = n.toLowerCase();
+    }
+    if( field_name === n ) {
+      return n+2; // 2 service fields at beginning
+    }
+  }
+  return -1;
+};
+
 Parser.prototype.parseRecordToObject = function(sequenceNumber, buffer) {
   var record = {
     '@sequenceNumber': sequenceNumber,
