@@ -18,19 +18,19 @@ var Parser = function(fileName, options) {
       this.recAsArray = options.recAsArray;
   }
 
-  var hNumRecs  = this.header.numberOfRecords
-    , hRecLen   = this.header.recordLength
-    , hDataSize = hNumRecs * hRecLen;
+  var hNumRecs  = this.header.numberOfRecords,
+      hRecLen   = this.header.recordLength,
+      hDataSize = hNumRecs * hRecLen;
 
-  var seqNumber  = 0
-    , skipBytes  = this.header.headerLength
-    , byteReaded = 0
-    , buffer     = new Buffer(0);
+  var seqNumber  = 0,
+      skipBytes  = this.header.headerLength,
+      byteReaded = 0,
+      buffer     = new Buffer(0);
 
-  function pushRecords( stream, buffer, buff_offset ) {
-    var buffPos = buff_offset
-      , buffLen = buffer.length
-      , rec;
+  var pushRecords = function pushRecords( stream, buffer, buff_offset ) {
+    var buffPos = buff_offset,
+        buffLen = buffer.length,
+        rec;
     
     while ( byteReaded<hDataSize && (buffPos+hRecLen)<=buffLen ) {
       if( self.recAsArray ) {
@@ -50,7 +50,7 @@ var Parser = function(fileName, options) {
       stream.push( rec );
     }
     return buffPos;
-  }
+  };
   
   this.stream = new stream.Transform({ 'objectMode': true });
   this.stream._transform = function( chunk, encoding, done ) {
@@ -128,8 +128,8 @@ Parser.prototype.parseRecordToArray = function(sequenceNumber, buffer) {
 };
 
 Parser.prototype.parseField = function(field, buffer) {
-  var st  = 0
-    , end = buffer.length;
+  var st  = 0,
+      end = buffer.length;
   while( end>st && buffer[end-1]===32 ) end--;
   while( st<end && buffer[st   ]===32 ) st++;
   
@@ -149,9 +149,9 @@ Parser.prototype.parseField = function(field, buffer) {
 
 
 Parser.prototype.getHeader = function() {
-  var fd = fs.openSync( this.fileName, 'r' )
-    , buff = new Buffer( 32 )
-    , header;
+  var fd = fs.openSync( this.fileName, 'r' ),
+      buff = new Buffer( 32 ),
+      header;
   fs.readSync( fd, buff, 0, 32, 0 );
   header = this.parseBaseHeader( buff );
   buff = new Buffer( header.headerLength );
@@ -183,9 +183,9 @@ Parser.prototype.parseFieldsHeader = function(header, data) {
 };
 
 Parser.prototype.parseHeaderDate = function(buffer) {
-  var day   = buffer.readUInt8( 0, true ) + 1900
-    , month = buffer.readUInt8( 1, true ) - 1
-    , year  = buffer.readUInt8( 2, true );
+  var day   = buffer.readUInt8( 0, true ) + 1900,
+      month = buffer.readUInt8( 1, true ) - 1,
+      year  = buffer.readUInt8( 2, true );
   return new Date( year, month, day );
 };
 
