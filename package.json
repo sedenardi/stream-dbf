@@ -12,9 +12,36 @@
     "stream",
     "dbf"
   ],
-  "author": "Sanders DeNardi <sedenardi@gmail.com> (http://www.sandersdenardi.com/)",
+  "author": {
+    "name": "Sanders DeNardi",
+    "email": "sedenardi@gmail.com",
+    "url": "http://www.sandersdenardi.com/"
+  },
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/sedenardi/stream-dbf/issues"
-  }
+  },
+  "gitHead": "2ae727743451dfa1f2c3d4df6297f5babedeb9df",
+  "_id": "stream-dbf@0.1.2",
+  "scripts": {},
+  "_shasum": "be6f8d95408ae700c406b9f40daeaba7644a11ee",
+  "_from": "stream-dbf@*",
+  "_npmVersion": "2.7.5",
+  "_nodeVersion": "1.6.4",
+  "_npmUser": {
+    "name": "sedenardi",
+    "email": "sedenardi@gmail.com"
+  },
+  "maintainers": [
+    {
+      "name": "sedenardi",
+      "email": "sedenardi@gmail.com"
+    }
+  ],
+  "dist": {
+    "shasum": "be6f8d95408ae700c406b9f40daeaba7644a11ee",
+    "tarball": "http://registry.npmjs.org/stream-dbf/-/stream-dbf-0.1.2.tgz"
+  },
+  "directories": {},
+  "_resolved": "https://registry.npmjs.org/stream-dbf/-/stream-dbf-0.1.2.tgz",
 }
