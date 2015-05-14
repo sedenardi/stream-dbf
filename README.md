@@ -11,9 +11,10 @@ A dBase DBF file parser that outputs a node stream.
 
 Create a new instance of the parser by specifying the file path of the dBase file, and optionally any of the `options` flags (described below).
 
-    var DBF = require('stream-dbf');
-
-    var parser = new DBF(fileName, [options]);
+```js
+var DBF = require('stream-dbf');
+var parser = new DBF(fileName, [options]);
+```
 
 ##options
 
@@ -24,30 +25,36 @@ Create a new instance of the parser by specifying the file path of the dBase fil
 
 Attach standard stream listeners to this object to access the records.
 
-    var stream = parser.stream;
-    stream.on('readable', function() {
-      var record = stream.read();
-      // do something with the record
-    });
-    stream.on('end', function() {
-      console.log('finished');
-    });
+```js
+var stream = parser.stream;
+stream.on('readable', function() {
+  var record = stream.read();
+  // do something with the record
+});
+stream.on('end', function() {
+  console.log('finished');
+});
+```
 
 You can also use the stream in [flowing mode](http://nodejs.org/api/stream.html#stream_event_data) by attaching a `data` event listener.
 
-    var stream = parser.stream;
-    stream.on('data', function(record) {
-      // do something with the record
-    });
-    stream.on('end', function() {
-      console.log('finished');
-    });
+```js
+var stream = parser.stream;
+stream.on('data', function(record) {
+  // do something with the record
+});
+stream.on('end', function() {
+  console.log('finished');
+});
+```
 
 Lastly, you can also pipe the stream like you would any other readable stream.
 
-    var stream = parser.stream;
-    var writableStream = somehowGetWritableStream();
-    stream.pipe(writableStream);
+```js
+var stream = parser.stream;
+var writableStream = somehowGetWritableStream();
+stream.pipe(writableStream);
+```
 
 ##parser.header
 
@@ -65,8 +72,23 @@ If need, field value can be returned as raw buffer for custom parsing (e.g. conv
 To enable this behavior you need set `raw` property to `true`:
 
 ```js
-  var DBF = require('stream-dbf');
-  var parser = new DBF(fileName, [options]);
-  parser.header.fields[1].raw = true;
+var DBF = require('stream-dbf');
+var parser = new DBF(fileName, [options]);
+parser.header.fields[1].raw = true;
+```
+
+##Array mode
+
+If `recAsArray` option is enabled emitted arrays will have `parser.header.fields.length`+2 items.
+Zero number item will be `sequenceNumber` and first item will be a deleted flag.
+
+For searching field number by you can use `getFieldNo(name[, case_sensitivity])` function:
+```js
+var DBF = require('stream-dbf');
+var parser = new DBF(fileName, {'recAsArray': true});
+var idxName = parser.getFieldNo("Name");
+parser.stream.on('data', function(record) {
+  console.log("Name: " + record[idxName]);
+});
 ```
 
