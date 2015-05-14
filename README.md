@@ -18,6 +18,7 @@ Create a new instance of the parser by specifying the file path of the dBase fil
 ##options
 
 * `parseTypes` - default: true - If false, integers and floats will be returned as strings.
+* `recAsArray` - default: false - If true, stream will emit arrays instead objects (this slightly improve throughput).
 
 ##parser.stream
 
@@ -51,3 +52,21 @@ Lastly, you can also pipe the stream like you would any other readable stream.
 ##parser.header
 
 Returns the header object, which contains information like the modified date, number of records, and a list of the fields and their types and lengths.
+
+###parser.header.fields
+
+Array object which contains information about fields.
+Every item is an object with next fields: `name`, `type`, `displacement`, `length`,
+`decimalPlaces`, `indexFlag`.
+
+####parser.header.fields.raw
+
+If need, field value can be returned as raw buffer for custom parsing (e.g. convert encodings).
+To enable this behavior you need set `raw` property to `true`:
+
+```js
+  var DBF = require('stream-dbf');
+  var parser = new DBF(fileName, [options]);
+  parser.header.fields[1].raw = true;
+```
+
