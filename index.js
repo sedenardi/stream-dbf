@@ -6,6 +6,7 @@ var stream = require('stream'),
 var Parser = function(fileName, options) {
   var self = this;
   this.fileName   = fileName;
+  this._fd        = 0;
   this.header     = this.getHeader();
   this.fieldsCnt  = this.header.fields.length;
   this.parseTypes = true;
@@ -54,24 +55,11 @@ var Parser = function(fileName, options) {
   
   this.stream = new stream.Transform({ 'objectMode': true });
   this.stream._transform = function( chunk, encoding, done ) {
-    var buffPos = 0
-      , buffLen = 0
-      , rec;
+    var buffPos = 0;
     buffer  = Buffer.concat([ buffer, chunk ]);
-    buffLen = buffer.length;
-    
-    if ( skipBytes ) {
-      if( skipBytes >= buffLen ) {
-        skipBytes = skipBytes - buffLen;
-        done();
-        return;
-      }
-      buffPos   = skipBytes;
-      skipBytes = 0;
-    }
     
     buffPos = pushRecords( this, buffer, buffPos );
-    buffer = buffer.slice( buffPos, buffLen );
+    buffer = buffer.slice( buffPos, buffer.length );
     done();
   };
   this.stream._flush = function( done ) {
@@ -81,7 +69,8 @@ var Parser = function(fileName, options) {
     done();
   };
 
-  fs.createReadStream(this.fileName).pipe(this.stream);
+  fs.createReadStream(this.fileName, {'start': skipBytes, 'fd': this._fd})
+    .pipe(this.stream);
 };
 
 util.inherits(Parser, events.EventEmitter);
@@ -149,15 +138,14 @@ Parser.prototype.parseField = function(field, buffer) {
 
 
 Parser.prototype.getHeader = function() {
-  var fd = fs.openSync( this.fileName, 'r' ),
-      buff = new Buffer( 32 ),
+  var buff = new Buffer( 32 ),
       header;
-  fs.readSync( fd, buff, 0, 32, 0 );
+  this._fd = fs.openSync( this.fileName, 'r' );
+  fs.readSync( this._fd, buff, 0, 32, 0 );
   header = this.parseBaseHeader( buff );
   buff = new Buffer( header.headerLength );
-  fs.readSync( fd, buff, 0, header.headerLength, 0 );
+  fs.readSync( this._fd, buff, 0, header.headerLength, 0 );
   this.parseFieldsHeader( header, buff );
-  fs.closeSync( fd );
   return header;
 };
 
