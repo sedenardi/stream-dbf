@@ -87,24 +87,23 @@ Parser.prototype.getFieldNo = function( field_name, case_sensitivity ) {
 };
 
 Parser.prototype.parseRecord = function( sequenceNumber, buffer ) {
-  var record;
-
-  if ( this.recordAsArray ) {
-    record = new Array( this.fieldsCnt + 2 );
-    record[ 0 ] = sequenceNumber;
-    record[ 1 ] = buffer[ 0 ] !== 32;
-  } else {
-    record = {
-      '@sequenceNumber': sequenceNumber,
-      '@deleted': buffer[ 0 ] !== 32
-    };
-  }
+  var record = new Array( this.fieldsCnt + 2 );
+  record[ 0 ] = sequenceNumber;
+  record[ 1 ] = buffer[ 0 ] !== 32;
 
   var loc = 1;
-  var idx;
   for ( var i = 0, field; field = this.header.fields[ i ]; i++ ) {
-    idx = this.recordAsArray ? i + 2 : field.name;
-    record[ idx ] = this.parseField( field, buffer.slice( loc, loc += field.length ) );
+    record[ i + 2 ] = this.parseField( field, buffer.slice( loc, loc += field.length ) );
+  }
+  if ( !this.recordAsArray ) {
+    var obj = {
+      '@sequenceNumber': record[ 0 ],
+      '@deleted': record[ 1 ]
+    };
+    for ( i = 0, field; field = this.header.fields[ i ]; i++ ) {
+      obj[ field.name ] = record[ i + 2 ];
+    }
+    return obj;
   }
   return record;
 };
