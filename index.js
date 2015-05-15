@@ -7,9 +7,9 @@ var Parser = function( input, options ) {
   options = options || {};
   var self = this;
   this.parser = options.parser;
-  this.parseTypes = ( typeof( options.parseTypes ) !== 'undefined' ) ? true : options.parseTypes;
-  this.recordAsArray = ( typeof( options.recordAsArray ) !== 'undefined' ) ? false : options.recordAsArray;
-  this.rawFieldValue = ( typeof( options.rawFieldValue ) !== 'undefined' ) ? false : options.rawFieldValue;
+  this.parseTypes = ( typeof( options.parseTypes ) === 'undefined' ) ? true : options.parseTypes;
+  this.recordAsArray = ( typeof( options.recordAsArray ) === 'undefined' ) ? false : options.recordAsArray;
+  this.rawFieldValue = ( typeof( options.rawFieldValue ) === 'undefined' ) ? false : options.rawFieldValue;
 
   this.inputStream = ( typeof( input ) === 'object' ) ? input : fs.createReadStream( input );
   this.stream = new stream.Transform( { objectMode: true } );
@@ -87,7 +87,7 @@ Parser.prototype.getFieldNo = function( field_name, case_sensitivity ) {
 };
 
 Parser.prototype.parseRecord = function( sequenceNumber, buffer ) {
-  var record = new Array( this.fieldsCnt + 2 );
+  var record = new Array( this.header.fields.length + 2 );
   record[ 0 ] = sequenceNumber;
   record[ 1 ] = buffer[ 0 ] !== 32;
 
