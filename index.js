@@ -6,50 +6,63 @@ var events = require( 'events' );
 var Parser = function( input, options ) {
   options = options || {};
   var self = this;
-  this.inputStream = ( typeof( input ) === 'object' ) ? input : fs.createReadStream( input );
-  this.decoder = options.decoder;
+  this.parser = options.parser;
   this.parseTypes = ( typeof( options.parseTypes ) !== 'undefined' ) ? true : options.parseTypes;
+  this.recordAsArray = ( typeof( options.recordAsArray ) !== 'undefined' ) ? false : options.recordAsArray;
+  this.rawFieldValue = ( typeof( options.rawFieldValue ) !== 'undefined' ) ? false : options.rawFieldValue;
 
+  this.inputStream = ( typeof( input ) === 'object' ) ? input : fs.createReadStream( input );
   this.stream = new stream.Transform( { objectMode: true } );
   this.header = {};
 
-  var hStart, hNumRecs, hRecLen, hEndLoc;
+  var hLength, hNumRecs, hRecLen, hEndLoc;
 
   var sequenceNumber = 0;
-  var loc = 0;
-  var bufLoc = 0;
-  var overflow = null;
+  var byteReaded = 0;
+  var buffer = new Buffer( 0 );
 
-  this.stream._transform = function( chunk, encoding, done ) {
-    var buffer = chunk;
-    if ( overflow !== null ) {
-      buffer = Buffer.concat( [ overflow, buffer ] );
-    }
-    if ( loc < 32 ) {
-      self.header = self.parseHeader( buffer );
-      hStart = self.header.start;
+  function parseBuffer( stream, lBuffer ) {
+    var buffPos = 0;
+    var bLength = lBuffer.length;
+    if ( byteReaded < 32 ) {
+      self.header = self.parseHeader( lBuffer );
+      hLength = self.header.headerLength;
       hNumRecs = self.header.numberOfRecords;
       hRecLen = self.header.recordLength;
-      hEndLoc = hStart + hNumRecs * hRecLen;
-      bufLoc = 32;
+      hEndLoc = hLength + hNumRecs * hRecLen;
+      buffPos = byteReaded = 32;
     }
-    if ( hStart ) {
-      if ( loc < hStart && bufLoc < hStart ) {
-        while ( bufLoc < ( hStart - 32 ) && ( bufLoc + 32 ) <= buffer.length ) {
-          self.header.fields.push( self.parseFieldSubRecord( buffer.slice( bufLoc, bufLoc += 32 ) ) );
+    if ( hLength ) {
+      if ( byteReaded < hLength ) {
+        var headerSize = hLength - 32;
+        while ( buffPos < headerSize && ( buffPos + 32 ) <= bLength ) {
+          self.header.fields.push( self.parseFieldSubRecord( lBuffer.slice( buffPos, buffPos += 32 ) ) );
         }
-        if ( bufLoc == hStart - 1 ) {
-          bufLoc = hStart;
+        if ( buffPos == hLength - 1 ) {
+          byteReaded = ++buffPos;
         }
       } else {
-        while ( loc < hEndLoc && ( bufLoc + hRecLen ) <= buffer.length ) {
-          this.push( self.parseRecord( ++sequenceNumber, buffer.slice( bufLoc, bufLoc += hRecLen ) ) );
+        while ( byteReaded < hEndLoc && ( buffPos + hRecLen ) <= bLength ) {
+          stream.push( self.parseRecord( ++sequenceNumber, lBuffer.slice( buffPos, buffPos += hRecLen ) ) );
+          byteReaded += hRecLen;
         }
       }
-      overflow = ( bufLoc < buffer.length ) ? buffer.slice( bufLoc, buffer.length ) : null;
     }
-    loc += bufLoc;
-    bufLoc = 0;
+    return buffPos;
+  }
+
+  this.stream._transform = function( chunk, encoding, done ) {
+    var buffPos;
+    buffer = Buffer.concat( [ buffer, chunk ] );
+    buffPos = parseBuffer( this, buffer );
+    buffer = buffer.slice( buffPos, buffer.length );
+    done();
+  };
+
+  this.stream._flush = function( done ) {
+    if( buffer.length > 0 ) {
+      parseBuffer( this, buffer );
+    }
     done();
   };
 
@@ -57,18 +70,41 @@ var Parser = function( input, options ) {
 };
 util.inherits( Parser, events.EventEmitter );
 
-Parser.prototype.parseRecord = function( sequenceNumber, buffer ) {
-  var self = this;
+Parser.prototype.getFieldNo = function( field_name, case_sensitivity ) {
+  if ( !case_sensitivity ) {
+    field_name = field_name.toLowerCase();
+  }
+  for ( var i = 0, n; i < this.fieldsCnt; i++ ) {
+    n = this.header.fields[ i ].name;
+    if ( !case_sensitivity ) {
+      n = n.toLowerCase();
+    }
+    if ( field_name === n ) {
+      return n + 2; // 2 service fields at beginning
+    }
+  }
+  return -1;
+};
 
-  var record = {
-    '@sequenceNumber': sequenceNumber,
-    '@deleted': ( buffer.slice( 0, 1 ) )[ 0 ] !== 32
-  };
+Parser.prototype.parseRecord = function( sequenceNumber, buffer ) {
+  var record;
+
+  if ( this.recordAsArray ) {
+    record = new Array( this.fieldsCnt + 2 );
+    record[ 0 ] = sequenceNumber;
+    record[ 1 ] = buffer[ 0 ] !== 32;
+  } else {
+    record = {
+      '@sequenceNumber': sequenceNumber,
+      '@deleted': buffer[ 0 ] !== 32
+    };
+  }
+
   var loc = 1;
-  for ( var i = 0; i < this.header.fields.length; i++ ) {
-    ( function( field ) {
-      record[ field.name ] = self.parseField( field, buffer.slice( loc, loc += field.length ) );
-    } )( this.header.fields[ i ] );
+  var idx;
+  for ( var i = 0, field; field = this.header.fields[ i ]; i++ ) {
+    idx = this.recordAsArray ? i + 2 : field.name;
+    record[ idx ] = this.parseField( field, buffer.slice( loc, loc += field.length ) );
   }
   return record;
 };
@@ -76,47 +112,53 @@ Parser.prototype.parseRecord = function( sequenceNumber, buffer ) {
 Parser.prototype.parseField = function( field, buffer ) {
   var self = this;
 
-  function bufferToString( useDecoder ) {
-    var t = useDecoder ? self.decoder( buffer ) : buffer.toString( 'utf-8' );
-    return t.replace( /^\x20+|\x20+$/g, '' );
+  var startPos = 0;
+  var endPos = buffer.length;
+  while ( endPos > startPos && buffer[ endPos - 1 ] === 32 ) endPos--;
+  while ( startPos < endPos && buffer[ startPos ] === 32 ) startPos++;
+  buffer = buffer.slice( startPos, endPos );
+
+  if( this.rawFieldValue ) {
+    return buffer;
   }
 
-  if ( this.parseTypes && ( field.type === 'N' || field.type === 'F' ) ) {
-    return Number( bufferToString() );
-  }
-  if ( this.decoder && field.type === 'C' ) {
-    return bufferToString( true );
+  var value = this.parser ? this.parser( field, buffer ) : null;
+  if ( !value ) {
+    value = buffer.toString( 'utf-8' );
+    if ( this.parseTypes && ( field.type === 'N' || field.type === 'F' ) ) {
+      value = +value;
+    }
   }
 
-  return bufferToString();
+  return value;
 };
 
 Parser.prototype.parseHeader = function( data ) {
-  var header = {};
-  header.type = ( data.slice( 0, 1 ) ).toString( 'utf-8' );
-  header.dateUpdated = this.parseHeaderDate( data.slice( 1, 4 ) );
-  header.numberOfRecords = ( data.slice( 4, 8 ) ).readInt32LE( 0, true );
-  header.start = ( data.slice( 8, 10 ) ).readInt32LE( 0, true );
-  header.recordLength = ( data.slice( 10, 12 ) ).readInt32LE( 0, true );
-  header.fields = [];
-  return header;
+  return {
+    'version': data.readUInt8( 0, true ),
+    'dateUpdated': this.parseHeaderDate( data.slice( 1, 4 ) ),
+    'numberOfRecords': data.readInt32LE( 4, true ),
+    'headerLength': data.readInt16LE( 8, true ),
+    'recordLength': data.readInt16LE( 10, true ),
+    'fields': []
+  };
 };
 
 Parser.prototype.parseHeaderDate = function( buffer ) {
-  var day, month, year;
-  year = 1900 + ( buffer.slice( 0, 1 ) ).readInt32LE( 0, true );
-  month = ( ( buffer.slice( 1, 2 ) ).readInt32LE( 0, true ) ) - 1;
-  day = ( buffer.slice( 2, 3 ) ).readInt32LE( 0, true );
+  var day = buffer.readUInt8( 0, true ) + 1900;
+  var month = buffer.readUInt8( 1, true ) - 1;
+  var year = buffer.readUInt8( 2, true );
   return new Date( year, month, day );
 };
 
 Parser.prototype.parseFieldSubRecord = function( buffer ) {
   return {
-    name: ( ( buffer.slice( 0, 11 ) ).toString( 'utf-8' )).replace( /[\u0000]+$/, '' ),
-    type: ( buffer.slice( 11, 12 ) ).toString( 'utf-8' ),
-    displacement: ( buffer.slice( 12, 16 ) ).readInt32LE( 0, true ),
-    length: ( buffer.slice( 16, 17 ) ).readInt32LE( 0, true ),
-    decimalPlaces: ( buffer.slice( 17, 18 ) ).readInt32LE( 0, true )
+    'name': buffer.toString( 'utf-8', 0, 11 ).replace( /\x00+$/, '' ),
+    'type': buffer.toString( 'utf-8', 11, 12 ),
+    'displacement': buffer.readInt32LE( 12, true ),
+    'length': buffer.readUInt8( 16, true ),
+    'decimalPlaces': buffer.readUInt8( 17, true ),
+    'indexFlag': buffer.readUInt8( 31, true )
   };
 };
 

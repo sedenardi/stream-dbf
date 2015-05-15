@@ -10,20 +10,23 @@ if ( use_iconv ) {
 
 var options = {
   parseTypes: true,
-  recAsArray: true,
-  decoder: use_iconv ? function( buf ) { return iconv.decode( buf, 'cp866' ); } : null
+  recordAsArray: false,
+  rawFieldValue: false,
+  parser: use_iconv ? function( field, buf ) { return field.type == 'C' ? iconv.decode( buf, 'cp866' ) : null; } : null
 };
 
 var inputStream = fs.createReadStream( './kladr.dbf' );
-var parse = new DBF( inputStream, options );
+var parser = new DBF( inputStream, options );
 var data = [];
+var r = 0;
 
-parse.stream.on( 'data', function( record ) {
+parser.stream.on( 'data', function( record ) {
+  //console.log( parser.header.numberOfRecords - r++ );
   if ( data.length < 10 ) {
     data.push( record );
   }
 } );
 
-parse.stream.on( 'end', function() {
+parser.stream.on( 'end', function() {
   console.log( JSON.stringify( data, null, 2 ) );
 } );
