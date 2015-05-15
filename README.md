@@ -12,17 +12,17 @@ A dBase DBF file parser that outputs a node stream.
 Create a new instance of the parser by specifying the file path of the dBase file, and optionally any of the `options` flags (described below).
 
 ```js
-var DBF = require('stream-dbf');
-var parser = new DBF(fileName, [options]);
+var DBF = require( 'stream-dbf' );
+var parser = new DBF( fileName, [options] );
 ```
 
 or
 
 ```js
-var fs = require('fs');
-var DBF = require('stream-dbf');
-var file = fs.createReadStream(filename);
-var parser = new DBF(file, [options]);
+var fs = require( 'fs' );
+var DBF = require( 'stream-dbf' );
+var file = fs.createReadStream( filename );
+var parser = new DBF( file, [options] );
 ```
 
 
@@ -39,12 +39,12 @@ Attach standard stream listeners to this object to access the records.
 
 ```js
 var stream = parser.stream;
-stream.on('readable', function() {
+stream.on( 'readable', function() {
   var record = stream.read();
   // do something with the record
 });
-stream.on('end', function() {
-  console.log('finished');
+stream.on( 'end', function() {
+  console.log( 'finished' );
 });
 ```
 
@@ -52,11 +52,11 @@ You can also use the stream in [flowing mode](http://nodejs.org/api/stream.html#
 
 ```js
 var stream = parser.stream;
-stream.on('data', function(record) {
+stream.on( 'data', function( record ) {
   // do something with the record
 });
-stream.on('end', function() {
-  console.log('finished');
+stream.on( 'end', function() {
+  console.log( 'finished' );
 });
 ```
 
@@ -65,7 +65,7 @@ Lastly, you can also pipe the stream like you would any other readable stream.
 ```js
 var stream = parser.stream;
 var writableStream = somehowGetWritableStream();
-stream.pipe(writableStream);
+stream.pipe( writableStream );
 ```
 
 ##parser.header
@@ -85,12 +85,12 @@ Zero number item will be `sequenceNumber` and first item will be a deleted flag.
 
 For searching field number by you can use `getFieldNo(name[, case_sensitivity])` function:
 ```js
-var DBF = require('stream-dbf');
-var parser = new DBF(fileName, {'recordAsArray': true});
-var idxName = parser.getFieldNo("Name");
-parser.stream.on('data', function(record) {
-  console.log("Name: " + record[idxName]);
-});
+var DBF = require( 'stream-dbf' );
+var parser = new DBF( fileName, { 'recordAsArray': true } );
+var idxName = parser.getFieldNo( 'Name' );
+parser.stream.on( 'data', function( record ) {
+  console.log( 'Name: ' + record[ idxName ] );
+} );
 ```
 
 ##Custom parser
