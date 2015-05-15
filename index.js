@@ -6,7 +6,8 @@ var events = require( 'events' );
 var Parser = function( input, options ) {
   options = options || {};
   var self = this;
-  this.parser = options.parser;
+  this.fieldValueParser = options.fieldValueParser;
+  this.onHeaderParsed = options.onHeaderParsed;
   this.parseTypes = ( typeof( options.parseTypes ) === 'undefined' ) ? true : options.parseTypes;
   this.recordAsArray = ( typeof( options.recordAsArray ) === 'undefined' ) ? false : options.recordAsArray;
   this.rawFieldValue = ( typeof( options.rawFieldValue ) === 'undefined' ) ? false : options.rawFieldValue;
@@ -40,6 +41,9 @@ var Parser = function( input, options ) {
         }
         if ( buffPos == hLength - 1 ) {
           byteReaded = ++buffPos;
+          if ( self.onHeaderParsed ) {
+            self.onHeaderParsed( self.header );
+          }
         }
       } else {
         while ( byteReaded < hEndLoc && ( buffPos + hRecLen ) <= bLength ) {
@@ -60,7 +64,7 @@ var Parser = function( input, options ) {
   };
 
   this.stream._flush = function( done ) {
-    if( buffer.length > 0 ) {
+    if ( buffer.length > 0 ) {
       parseBuffer( this, buffer );
     }
     done();
@@ -109,19 +113,17 @@ Parser.prototype.parseRecord = function( sequenceNumber, buffer ) {
 };
 
 Parser.prototype.parseField = function( field, buffer ) {
-  var self = this;
-
   var startPos = 0;
   var endPos = buffer.length;
   while ( endPos > startPos && buffer[ endPos - 1 ] === 32 ) endPos--;
   while ( startPos < endPos && buffer[ startPos ] === 32 ) startPos++;
   buffer = buffer.slice( startPos, endPos );
 
-  if( this.rawFieldValue ) {
+  if ( this.rawFieldValue || field.raw ) {
     return buffer;
   }
 
-  var value = this.parser ? this.parser( field, buffer ) : null;
+  var value = this.fieldValueParser ? this.fieldValueParser( field, buffer ) : null;
   if ( !value ) {
     value = buffer.toString( 'utf-8' );
     if ( this.parseTypes && ( field.type === 'N' || field.type === 'F' ) ) {

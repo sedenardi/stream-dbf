@@ -13,7 +13,7 @@ var dbfOptions = {
   parseTypes: true,
   recordAsArray: false,
   rawFieldValue: false,
-  parser: function( field, buf ) {
+  fieldValueParser: function( field, buf ) {
     return field.type == 'C' ? iconv.decode( buf, 'cp866' ) : null;
   }
 };

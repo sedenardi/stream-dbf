@@ -2,11 +2,14 @@ var DBF = require( '../index.js' );
 var iconv = require( 'iconv-lite' ); // npm install iconv-lite
 
 var dbfOptions = {
-  parseTypes: true,
+  parseTypes: false,
   recordAsArray: false,
   rawFieldValue: false,
-  parser: function( field, buf ) {
+  fieldValueParser: function( field, buf ) {
     return field.type == 'C' ? iconv.decode( buf, 'cp866' ) : null;
+  },
+  onHeaderParsed: function( header ) {
+    header.fields[ 0 ].raw = true;
   }
 };
 

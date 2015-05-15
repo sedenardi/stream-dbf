@@ -30,8 +30,9 @@ var parser = new DBF( file, [options] );
 
 * `parseTypes` - default: true - If false, integers and floats will be returned as strings.
 * `recordAsArray` - default: false - If true, stream will emit arrays instead objects (this slightly improve throughput).
-* `rawFieldValue` - default: false - If true, field value returned as raw buffer for custom parsing.
-* `parser` - default: null - function like `function( field, buffer )` for custom parsing field values. Function must return parsed value or null, if returned null, then be used standard parser. If `rawFieldValue` option is set, then parser not used!
+* `rawFieldValue` - default: false - If true, all field value returned as raw buffer for custom parsing.
+* `fieldValueParser` - default: null - function like `function( field, buffer )` for custom parsing field values. Function must return parsed value or null, if returned null, then be used standard parser. If `rawFieldValue` option is set, then parser not used!
+* `onHeaderParsed` - default: null - function like `function( header )` for header manipulation (see below), invoked once when header parsed.
 
 ##parser.stream
 
@@ -93,6 +94,20 @@ parser.stream.on( 'data', function( record ) {
 } );
 ```
 
+####parser.header.fields.raw
+
+If need, field value can be returned as raw buffer for custom parsing (e.g. convert encodings).
+To enable this behavior you need set `raw` property to `true`:
+
+```js
+var DBF = require( 'stream-dbf' );
+var parser = new DBF( fileName, { onHeaderParsed: function( header ) {
+  parser.header.fields[ 1 ].raw = true;
+} } );
+```
+
+Fields with `raw = true`, not parsed internal and external ( `fieldValueParser` ) parsers.
+
 ##Custom parser
 
 If `parser` option is function, it will used for parse field value.
@@ -106,7 +121,7 @@ function valueParse( field, buffer ) {
   return field.type == 'C' ? decode( buffer, 'cp866' ) : null;
 };
 
-var parser = new DBF( file, { parser: valueParse } );
+var parser = new DBF( file, { fieldValueParser: valueParse } );
 var data = [];
 
 parser.stream.on( 'data', function( record ) {
