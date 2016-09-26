@@ -85,7 +85,7 @@ Parser.prototype.getFieldNo = function( field_name, case_sensitivity ) {
       n = n.toLowerCase();
     }
     if( field_name === n ) {
-      return n+2; // 2 service fields at beginning
+      return i+2; // 2 service fields at beginning
     }
   }
   return -1;
