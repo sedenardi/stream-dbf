@@ -1,7 +1,8 @@
 var stream = require('stream'),
     fs = require('fs'),
     util = require('util'),
-    events = require('events');
+    events = require('events'),
+    iconvLite = require('iconv-lite');
 
 var Parser = function(fileName, options) {
   var self = this;
