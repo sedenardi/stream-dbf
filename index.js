@@ -18,6 +18,8 @@ var Parser = function(fileName, options) {
       this.parseTypes = options.parseTypes;
     if ( options.recAsArray != undefined )
       this.recAsArray = options.recAsArray;
+    if ( options.encoding != undefined)
+      this.encoding = options.encoding;
   }
 
   var hNumRecs  = this.header.numberOfRecords,
@@ -127,7 +129,7 @@ Parser.prototype.parseField = function(field, buffer) {
         return buffer.slice( st, end );
   }
 
-  var data = buffer.toString( 'utf-8', st, end );
+  var data = decodeString( buffer, st, end, this.encoding );
   if ( this.parseTypes ) {
     if ( field.type==='N' || field.type==='F' ) {
       data = Number( data );
@@ -180,8 +182,8 @@ Parser.prototype.parseHeaderDate = function(buffer) {
 
 Parser.prototype.parseFieldSubRecord = function(buffer) {
   var field = {
-    'name'         : buffer.toString( 'utf-8',  0, 11 ).replace( /\x00+$/, '' ),
-    'type'         : buffer.toString( 'utf-8', 11, 12 ),
+    'name'         : decodeString( buffer, 0, 11, this.encoding ).replace( /\x00+$/, '' ),
+    'type'         : decodeString( buffer, 11, 12, this.encoding ),
     'displacement' : buffer.readInt32LE( 12, true ),
     'length'       : buffer.readUInt8( 16, true ),
     'decimalPlaces': buffer.readUInt8( 17, true ),
@@ -189,5 +191,13 @@ Parser.prototype.parseFieldSubRecord = function(buffer) {
   };
   return field;
 };
+
+function decodeString(buffer, startIdx, endIdx, encoding){
+  if( !encoding ) {
+    return buffer.toString( 'utf-8', startIdx, endIdx );
+  } else {
+    return iconvLite.decode( buffer.slice( startIdx, endIdx - startIdx), encoding)
+  }
+}
 
 module.exports = Parser;
