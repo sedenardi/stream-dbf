@@ -196,7 +196,7 @@ function decodeString(buffer, startIdx, endIdx, encoding){
   if( !encoding ) {
     return buffer.toString( 'utf-8', startIdx, endIdx );
   } else {
-    return iconvLite.decode( buffer.slice( startIdx, endIdx - startIdx), encoding)
+    return iconvLite.decode( buffer.slice( startIdx, endIdx ), encoding)
   }
 }
 
