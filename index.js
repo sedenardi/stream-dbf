@@ -1,23 +1,35 @@
 var stream = require('stream'),
     fs = require('fs'),
     util = require('util'),
+    iconv = require('iconv-lite'),
     events = require('events');
 
 var Parser = function(fileName, options) {
   var self = this;
   this.fileName   = fileName;
   this._fd        = 0;
-  this.header     = this.getHeader();
-  this.fieldsCnt  = this.header.fields.length;
   this.parseTypes = true;
   this.recAsArray = false;
+  this.encoding   = 'utf-8';
+  this.lowercase  = false; // lowercase the field names or not
+  this.withMeta   = true;
 
   if (options) {
     if ( options.parseTypes != undefined )
       this.parseTypes = options.parseTypes;
     if ( options.recAsArray != undefined )
       this.recAsArray = options.recAsArray;
+    if ( options.encoding != undefined )
+      this.encoding = options.encoding;
+    if ( options.lowercase != undefined )
+      this.lowercase = options.lowercase;
+    if ( options.withMeta != undefined )
+      this.withMeta = options.withMeta;
   }
+
+  this.header     = this.getHeader();
+  this.fieldsCnt  = this.header.fields.length;
+
 
   var hNumRecs  = this.header.numberOfRecords,
       hRecLen   = this.header.recordLength,
@@ -91,15 +103,20 @@ Parser.prototype.getFieldNo = function( field_name, case_sensitivity ) {
   return -1;
 };
 
+function isValidType(type) {
+  return type !== 0 && type !== '0' && type !== '\u0000';
+}
 Parser.prototype.parseRecordToObject = function(sequenceNumber, buffer) {
-  var record = {
+  var record = this.withMeta ? {
     '@sequenceNumber': sequenceNumber,
     '@deleted'       : buffer[0] !== 32
-  };
+  } : {};
   for ( var i=0, pos=1, fld; i < this.fieldsCnt; i++ ) {
     fld = this.header.fields[i];
-    record[fld.name] = this.parseField( fld, buffer.slice(pos, pos+fld.length) );
-    pos += fld.length;
+    if (isValidType(fld.type)) {
+      record[fld.name] = this.parseField( fld, buffer.slice(pos, pos+fld.length) );
+      pos += fld.length;
+    }
   }
   return record;
 };
@@ -126,7 +143,7 @@ Parser.prototype.parseField = function(field, buffer) {
         return buffer.slice( st, end );
   }
 
-  var data = buffer.toString( 'utf-8', st, end );
+  var data = iconv.decode(buffer.slice(st, end), this.encoding);
   if ( this.parseTypes ) {
     if ( field.type==='N' || field.type==='F' ) {
       data = Number( data );
@@ -167,7 +184,8 @@ Parser.prototype.parseFieldsHeader = function(header, data) {
     fieldData.push( data.slice(i, i + 32) );
   }
 
-  header.fields = fieldData.map(this.parseFieldSubRecord);
+  var func = this.parseFieldSubRecord.bind(this);
+  header.fields = fieldData.map(func);
 };
 
 Parser.prototype.parseHeaderDate = function(buffer) {
@@ -178,9 +196,13 @@ Parser.prototype.parseHeaderDate = function(buffer) {
 };
 
 Parser.prototype.parseFieldSubRecord = function(buffer) {
+  var fieldName = iconv.decode(buffer.slice(0, 11), this.encoding).replace( /\x00+$/, '' );
+  if (this.lowercase) {
+    fieldName = fieldName.toLowerCase();
+  }
   var field = {
-    'name'         : buffer.toString( 'utf-8',  0, 11 ).replace( /\x00+$/, '' ),
-    'type'         : buffer.toString( 'utf-8', 11, 12 ),
+    'name'         : fieldName,
+    'type'         : buffer.toString( 'utf-8', 11, 12 ), // use ASCII or UTF-8
     'displacement' : buffer.readInt32LE( 12, true ),
     'length'       : buffer.readUInt8( 16, true ),
     'decimalPlaces': buffer.readUInt8( 17, true ),
