@@ -3,11 +3,11 @@ stream-dbf
 
 A dBase DBF file parser that outputs a node stream.
 
-`stream-dbf` uses the logic from abstractvector's [node-dbf](https://github.com/abstractvector/node-dbf) in a `Transform` stream. It's written in plain javascript and has no dependencies.
+`stream-dbf` uses the logic from abstractvector's [node-dbf](https://github.com/abstractvector/node-dbf) in a `Transform` stream. It's written in plain JavaScript.
 
     npm install stream-dbf
 
-#Usage
+# Usage
 
 Create a new instance of the parser by specifying the file path of the dBase file, and optionally any of the `options` flags (described below).
 
@@ -16,12 +16,15 @@ var DBF = require('stream-dbf');
 var parser = new DBF(fileName, [options]);
 ```
 
-##options
+## options
 
 * `parseTypes` - default: true - If false, integers and floats will be returned as strings.
 * `recAsArray` - default: false - If true, stream will emit arrays instead objects (this slightly improve throughput).
+* `encoding`   - default: "utf-8" - It is passed to the `iconv-lite` to decode the field names and values in order to support encodings like GBK etc.
+* `lowercase`  - default: false - If true, the field names will be converted to lowercase.
+* `withMeta`   - default: true - If true, each record will contain two meta fields named "@sequenceNumber" and "@deleted".
 
-##parser.stream
+## parser.stream
 
 Attach standard stream listeners to this object to access the records.
 
@@ -56,17 +59,17 @@ var writableStream = somehowGetWritableStream();
 stream.pipe(writableStream);
 ```
 
-##parser.header
+## parser.header
 
 Returns the header object, which contains information like the modified date, number of records, and a list of the fields and their types and lengths.
 
-###parser.header.fields
+### parser.header.fields
 
 Array object which contains information about fields.
 Every item is an object with next fields: `name`, `type`, `displacement`, `length`,
 `decimalPlaces`, `indexFlag`.
 
-####parser.header.fields.raw
+#### parser.header.fields.raw
 
 If need, field value can be returned as raw buffer for custom parsing (e.g. convert encodings).
 To enable this behavior you need set `raw` property to `true`:
@@ -77,7 +80,7 @@ var parser = new DBF(fileName, [options]);
 parser.header.fields[1].raw = true;
 ```
 
-##Array mode
+## Array mode
 
 If `recAsArray` option is enabled emitted arrays will have `parser.header.fields.length`+2 items.
 Zero number item will be `sequenceNumber` and first item will be a deleted flag.
